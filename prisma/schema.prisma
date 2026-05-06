@@ -1,0 +1,514 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Translation {
+  id        String   @id @default(uuid())
+  entity    String
+  entityId  String
+  field     String
+  locale    String
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([entity, entityId, field, locale])
+  @@index([entity, entityId])
+  @@index([locale])
+  @@map("translations")
+}
+
+model AdminUser {
+  id            String         @id @default(uuid())
+  name          String         @db.VarChar(100)
+  email         String         @unique @db.VarChar(150)
+  passwordHash  String         @map("password_hash")
+  role          AdminRole      @default(editor)
+  avatarUrl     String?        @map("avatar_url")
+  isActive      Boolean        @default(true) @map("is_active")
+  lastLoginAt   DateTime?      @map("last_login_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  blogArticles  BlogArticle[]
+  bookings      Booking[]
+  galleryPhotos GalleryPhoto[]
+  invoices      Invoice[]
+  notifications Notification[]
+  settings      Setting[]
+
+  @@map("admin_users")
+}
+
+model Client {
+  id             String       @id @default(uuid())
+  fullName       String       @map("full_name") @db.VarChar(150)
+  email          String       @unique @db.VarChar(150)
+  phone          String?      @db.VarChar(30)
+  whatsapp       String?      @db.VarChar(30)
+  country        String?      @db.VarChar(100)
+  city           String?      @db.VarChar(100)
+  passportNumber String?      @map("passport_number") @db.VarChar(50)
+  birthDate      DateTime?    @map("birth_date") @db.Date
+  language       String       @default("es") @db.VarChar(10)
+  howFoundUs     HowFoundUs?  @map("how_found_us")
+  tags           String[]
+  internalNotes  String?      @map("internal_notes")
+  totalBookings  Int          @default(0) @map("total_bookings")
+  totalSpent     Decimal      @default(0) @map("total_spent") @db.Decimal(10, 2)
+  isVip          Boolean      @default(false) @map("is_vip")
+  status         ClientStatus @default(active)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  bookings       Booking[]
+  invoices       Invoice[]
+  reviews        Review[]
+
+  @@map("clients")
+}
+
+model Tour {
+  id              String             @id @default(uuid())
+  slug            String             @unique @db.VarChar(200)
+  category        TourCategory?
+  durationDays    Int?               @map("duration_days")
+  durationHours   Int?               @map("duration_hours")
+  difficulty      Int?               @db.SmallInt
+  minGroupSize    Int                @default(1) @map("min_group_size")
+  maxGroupSize    Int                @default(15) @map("max_group_size")
+  pricePerPerson  Decimal            @map("price_per_person") @db.Decimal(10, 2)
+  discount3to5Pax Decimal            @default(10) @map("discount_3_5_pax") @db.Decimal(5, 2)
+  discount6Plus   Decimal            @default(20) @map("discount_6_plus") @db.Decimal(5, 2)
+  departureTime   DateTime?          @map("departure_time") @db.Time(6)
+  bestSeasons     String[]           @map("best_seasons")
+  thumbnailUrl    String?            @map("thumbnail_url")
+  status          TourStatus         @default(draft)
+  totalBookings   Int                @default(0) @map("total_bookings")
+  totalRevenue    Decimal            @default(0) @map("total_revenue") @db.Decimal(10, 2)
+  avgRating       Decimal            @default(0) @map("avg_rating") @db.Decimal(3, 2)
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  blogArticles    BlogArticle[]
+  bookings        Booking[]
+  galleryPhotos   GalleryPhoto[]
+  reviews         Review[]
+  availability    TourAvailability[]
+  faqs            TourFaq[]
+  itinerary       TourItinerary[]
+  photos          TourPhoto[]
+
+  @@map("tours")
+}
+
+model TourPhoto {
+  id        String   @id @default(uuid())
+  tourId    String   @map("tour_id")
+  url       String
+  altText   String?  @map("alt_text") @db.VarChar(200)
+  isCover   Boolean  @default(false) @map("is_cover")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  tour      Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  @@map("tour_photos")
+}
+
+model TourItinerary {
+  id        String    @id @default(uuid())
+  tourId    String    @map("tour_id")
+  dayNumber Int       @map("day_number")
+  time      DateTime? @db.Time(6)
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime  @default(now()) @map("created_at")
+  tour      Tour      @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  @@map("tour_itinerary")
+}
+
+model TourFaq {
+  id        String   @id @default(uuid())
+  tourId    String   @map("tour_id")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  tour      Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  @@map("tour_faqs")
+}
+
+model TourAvailability {
+  id             String             @id @default(uuid())
+  tourId         String             @map("tour_id")
+  date           DateTime           @db.Date
+  availableSeats Int                @map("available_seats")
+  bookedSeats    Int                @default(0) @map("booked_seats")
+  specialPrice   Decimal?           @map("special_price") @db.Decimal(10, 2)
+  status         AvailabilityStatus @default(available)
+  createdAt      DateTime           @default(now()) @map("created_at")
+  tour           Tour               @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  @@unique([tourId, date])
+  @@index([tourId, date])
+  @@map("tour_availability")
+}
+
+model Booking {
+  id                  String             @id @default(uuid())
+  bookingNumber       String             @unique @map("booking_number") @db.VarChar(20)
+  clientId            String             @map("client_id")
+  tourId              String             @map("tour_id")
+  tourDate            DateTime           @map("tour_date") @db.Date
+  travelers           Int                @default(1)
+  unitPrice           Decimal            @map("unit_price") @db.Decimal(10, 2)
+  discountPercent     Decimal            @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  discountAmount      Decimal            @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  subtotal            Decimal            @db.Decimal(10, 2)
+  igvPercent          Decimal            @default(18) @map("igv_percent") @db.Decimal(5, 2)
+  igvAmount           Decimal            @default(0) @map("igv_amount") @db.Decimal(10, 2)
+  totalAmount         Decimal            @map("total_amount") @db.Decimal(10, 2)
+  depositPercent      Decimal            @default(30) @map("deposit_percent") @db.Decimal(5, 2)
+  depositAmount       Decimal            @default(0) @map("deposit_amount") @db.Decimal(10, 2)
+  pendingAmount       Decimal            @default(0) @map("pending_amount") @db.Decimal(10, 2)
+  specialRequirements String?            @map("special_requirements")
+  howFoundUs          HowFoundUs?        @map("how_found_us")
+  bookingSource       BookingSource      @default(website) @map("booking_source")
+  status              BookingStatus      @default(pending)
+  paymentStatus       PaymentStatus      @default(pending) @map("payment_status")
+  internalNotes       String?            @map("internal_notes")
+  confirmationSent    Boolean            @default(false) @map("confirmation_sent")
+  reminderSent        Boolean            @default(false) @map("reminder_sent")
+  createdBy           String?            @map("created_by")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+  client              Client             @relation(fields: [clientId], references: [id])
+  admin               AdminUser?         @relation(fields: [createdBy], references: [id])
+  tour                Tour               @relation(fields: [tourId], references: [id])
+  chatConversations   ChatConversation[]
+  invoices            Invoice[]
+  payments            Payment[]
+  reviews             Review[]
+
+  @@index([clientId])
+  @@index([tourId])
+  @@index([tourDate])
+  @@index([status])
+  @@map("bookings")
+}
+
+model Payment {
+  id              String         @id @default(uuid())
+  bookingId       String         @map("booking_id")
+  amount          Decimal        @db.Decimal(10, 2)
+  currency        String         @default("USD") @db.VarChar(3)
+  method          PaymentMethod?
+  type            PaymentType?
+  status          PaymentStatus  @default(pending)
+  gatewayId       String?        @map("gateway_id") @db.VarChar(200)
+  gatewayResponse Json?          @map("gateway_response")
+  notes           String?
+  paidAt          DateTime?      @map("paid_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  booking         Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@map("payments")
+}
+
+model Invoice {
+  id             String        @id @default(uuid())
+  invoiceNumber  String        @unique @map("invoice_number") @db.VarChar(20)
+  bookingId      String        @map("booking_id")
+  clientId       String        @map("client_id")
+  issueDate      DateTime      @default(now()) @map("issue_date") @db.Date
+  dueDate        DateTime?     @map("due_date") @db.Date
+  subtotal       Decimal       @db.Decimal(10, 2)
+  discountAmount Decimal       @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  igvPercent     Decimal       @default(18) @map("igv_percent") @db.Decimal(5, 2)
+  igvAmount      Decimal       @map("igv_amount") @db.Decimal(10, 2)
+  totalAmount    Decimal       @map("total_amount") @db.Decimal(10, 2)
+  includeIgv     Boolean       @default(true) @map("include_igv")
+  paymentMethod  String?       @map("payment_method") @db.VarChar(30)
+  notes          String?
+  terms          String?
+  status         InvoiceStatus @default(pending)
+  pdfUrl         String?       @map("pdf_url")
+  sentAt         DateTime?     @map("sent_at")
+  paidAt         DateTime?     @map("paid_at")
+  createdBy      String?       @map("created_by")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  booking        Booking       @relation(fields: [bookingId], references: [id])
+  client         Client        @relation(fields: [clientId], references: [id])
+  admin          AdminUser?    @relation(fields: [createdBy], references: [id])
+
+  @@index([bookingId])
+  @@index([clientId])
+  @@map("invoices")
+}
+
+model Review {
+  id         String       @id @default(uuid())
+  clientId   String       @map("client_id")
+  tourId     String       @map("tour_id")
+  bookingId  String       @map("booking_id")
+  rating     Int          @db.SmallInt
+  source     ReviewSource @default(website)
+  status     ReviewStatus @default(pending)
+  isFeatured Boolean      @default(false) @map("is_featured")
+  isFakeFlag Boolean      @default(false) @map("is_fake_flag")
+  repliedAt  DateTime?    @map("replied_at")
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+  booking    Booking      @relation(fields: [bookingId], references: [id])
+  client     Client       @relation(fields: [clientId], references: [id])
+  tour       Tour         @relation(fields: [tourId], references: [id])
+
+  @@index([tourId])
+  @@index([status])
+  @@map("reviews")
+}
+
+model BlogArticle {
+  id              String        @id @default(uuid())
+  slug            String        @unique @db.VarChar(300)
+  category        BlogCategory?
+  heroImageUrl    String?       @map("hero_image_url")
+  authorName      String?       @map("author_name") @db.VarChar(100)
+  authorAvatarUrl String?       @map("author_avatar_url")
+  readTimeMinutes Int?          @map("read_time_minutes")
+  relatedTourId   String?       @map("related_tour_id")
+  tags            String[]
+  status          BlogStatus    @default(draft)
+  scheduledAt     DateTime?     @map("scheduled_at")
+  publishedAt     DateTime?     @map("published_at")
+  viewsCount      Int           @default(0) @map("views_count")
+  createdBy       String?       @map("created_by")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  admin           AdminUser?    @relation(fields: [createdBy], references: [id])
+  relatedTour     Tour?         @relation(fields: [relatedTourId], references: [id])
+
+  @@index([slug])
+  @@index([status])
+  @@map("blog_articles")
+}
+
+model GalleryPhoto {
+  id         String     @id @default(uuid())
+  url        String
+  altText    String?    @map("alt_text") @db.VarChar(200)
+  tourId     String?    @map("tour_id")
+  isFeatured Boolean    @default(false) @map("is_featured")
+  sortOrder  Int        @default(0) @map("sort_order")
+  uploadedBy String?    @map("uploaded_by")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  tour       Tour?      @relation(fields: [tourId], references: [id])
+  admin      AdminUser? @relation(fields: [uploadedBy], references: [id])
+
+  @@map("gallery_photos")
+}
+
+model ChatConversation {
+  id             String        @id @default(uuid())
+  visitorId      String?       @map("visitor_id") @db.VarChar(100)
+  visitorCountry String?       @map("visitor_country") @db.VarChar(100)
+  visitorDevice  String?       @map("visitor_device") @db.VarChar(50)
+  pageOrigin     String?       @map("page_origin")
+  messagesCount  Int           @default(0) @map("messages_count")
+  converted      Boolean       @default(false)
+  bookingId      String?       @map("booking_id")
+  status         ChatStatus    @default(open)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  booking        Booking?      @relation(fields: [bookingId], references: [id])
+  messages       ChatMessage[]
+
+  @@index([visitorId])
+  @@map("chat_conversations")
+}
+
+model ChatMessage {
+  id             String           @id @default(uuid())
+  conversationId String           @map("conversation_id")
+  role           ChatRole
+  content        String
+  createdAt      DateTime         @default(now()) @map("created_at")
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+model Setting {
+  id          String     @id @default(uuid())
+  key         String     @unique @db.VarChar(100)
+  value       String?
+  valueJson   Json?      @map("value_json")
+  description String?
+  updatedBy   String?    @map("updated_by")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  admin       AdminUser? @relation(fields: [updatedBy], references: [id])
+
+  @@map("settings")
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  type      String?   @db.VarChar(50)
+  title     String?   @db.VarChar(200)
+  message   String?
+  link      String?
+  isRead    Boolean   @default(false) @map("is_read")
+  createdAt DateTime  @default(now()) @map("created_at")
+  admin     AdminUser @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model sunat_series {
+  id             String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  tipo_documento String    @db.VarChar(2)
+  serie          String    @db.VarChar(4)
+  correlativo    Int?      @default(1)
+  is_active      Boolean?  @default(true)
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
+  updated_at     DateTime? @default(now()) @db.Timestamp(6)
+
+  @@unique([tipo_documento, serie])
+}
+
+enum AdminRole {
+  super_admin
+  editor
+  viewer
+}
+
+enum HowFoundUs {
+  google
+  instagram
+  facebook
+  whatsapp
+  referral
+  tripadvisor
+  blog
+  other
+}
+
+enum ClientStatus {
+  active
+  vip
+  inactive
+}
+
+enum TourCategory {
+  cultural
+  adventure
+  nature
+  mixed
+}
+
+enum TourStatus {
+  draft
+  published
+  featured
+  hidden
+}
+
+enum AvailabilityStatus {
+  available
+  almost_full
+  full
+  blocked
+}
+
+enum BookingSource {
+  website
+  whatsapp
+  referral
+  tripadvisor
+  phone
+  other
+}
+
+enum BookingStatus {
+  pending
+  confirmed
+  completed
+  canceled
+  refunded
+}
+
+enum PaymentStatus {
+  pending
+  deposit_paid
+  paid
+  refunded
+  failed
+}
+
+enum PaymentMethod {
+  culqi
+  paypal
+  yape
+  plin
+  bank_transfer
+  cash
+  whatsapp_arranged
+}
+
+enum PaymentType {
+  deposit
+  full
+  remainder
+  refund
+}
+
+enum InvoiceStatus {
+  pending
+  paid
+  overdue
+  canceled
+}
+
+enum ReviewSource {
+  website
+  tripadvisor
+  google
+  facebook
+}
+
+enum ReviewStatus {
+  pending
+  approved
+  rejected
+  featured
+}
+
+enum BlogCategory {
+  tips
+  guides
+  stories
+  news
+}
+
+enum BlogStatus {
+  draft
+  published
+  scheduled
+}
+
+enum ChatStatus {
+  open
+  converted
+  needs_followup
+  spam
+  closed
+}
+
+enum ChatRole {
+  user
+  assistant
+}
