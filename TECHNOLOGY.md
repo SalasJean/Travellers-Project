@@ -384,3 +384,9 @@ mkdir src/infrastructure/config
 mkdir src/shared/types
 mkdir src/shared/constants
 mkdir src/shared/utils
+
+
+------------------------------
+recuerda que las dependecias de mapper es muy importante no olvidar si? 
+Instala la dependencia necesaria:
+bashnpm install @nestjs/mapped-types

@@ -12,6 +12,8 @@ const STATUS_MAP: Record<string, HttpStatus> = {
   USER_INACTIVE: HttpStatus.FORBIDDEN,
   USER_ALREADY_EXISTS: HttpStatus.CONFLICT,
   USER_NOT_FOUND: HttpStatus.NOT_FOUND,
+  TOUR_NOT_FOUND:      HttpStatus.NOT_FOUND,       // 👈 nuevo
+  TOUR_SLUG_EXISTS:    HttpStatus.CONFLICT,         // 👈 nuevo
 };
 
 @Catch(DomainException)

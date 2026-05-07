@@ -36,3 +36,15 @@ export class UserNotFoundException extends DomainException {
     super('User not found', 'USER_NOT_FOUND');
   }
 }
+
+export class TourNotFoundException extends DomainException {
+  constructor() {
+    super('Tour not found', 'TOUR_NOT_FOUND')
+  }
+}
+
+export class TourSlugAlreadyExistsException extends DomainException {
+  constructor() {
+    super('Tour slug already exists', 'TOUR_SLUG_EXISTS')
+  }
+}

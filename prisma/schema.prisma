@@ -39,6 +39,11 @@ model AdminUser {
   invoices      Invoice[]
   notifications Notification[]
   settings      Setting[]
+  promoCodes    PromoCode[]
+  createdPackages Package[]
+  emailCampaigns  EmailCampaign[]
+  sunatNotasCreated SunatNota[]
+  sunatBajasCreated SunatBaja[]
 
   @@map("admin_users")
 }
@@ -66,6 +71,7 @@ model Client {
   bookings       Booking[]
   invoices       Invoice[]
   reviews        Review[]
+  wishlists      Wishlist[]
 
   @@map("clients")
 }
@@ -99,6 +105,9 @@ model Tour {
   faqs            TourFaq[]
   itinerary       TourItinerary[]
   photos          TourPhoto[]
+  packageTours    PackageTour[]
+  wishlists       Wishlist[]
+  tourTranslations TourTranslation[]
 
   @@map("tours")
 }
@@ -148,6 +157,7 @@ model TourAvailability {
   status         AvailabilityStatus @default(available)
   createdAt      DateTime           @default(now()) @map("created_at")
   tour           Tour               @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  guides         TourAvailabilityGuide[]
 
   @@unique([tourId, date])
   @@index([tourId, date])
@@ -180,15 +190,28 @@ model Booking {
   confirmationSent    Boolean            @default(false) @map("confirmation_sent")
   reminderSent        Boolean            @default(false) @map("reminder_sent")
   createdBy           String?            @map("created_by")
+  promoCodeId         String?            @map("promo_code_id")
+  promoCodeField      String?            @map("promo_code") @db.VarChar(50)
+  guideId             String?            @map("guide_id")
+  packageId           String?            @map("package_id")
+  affiliateId         String?            @map("affiliate_id")
+  referralCode        String?            @map("referral_code") @db.VarChar(50)
+  commissionAmount    Decimal            @default(0) @map("commission_amount") @db.Decimal(10, 2)
+  insuranceAmount     Decimal            @default(0) @map("insurance_amount") @db.Decimal(10, 2)
   createdAt           DateTime           @default(now()) @map("created_at")
   updatedAt           DateTime           @updatedAt @map("updated_at")
   client              Client             @relation(fields: [clientId], references: [id])
   admin               AdminUser?         @relation(fields: [createdBy], references: [id])
   tour                Tour               @relation(fields: [tourId], references: [id])
+  promoCode           PromoCode?         @relation(fields: [promoCodeId], references: [id])
+  guide               Guide?             @relation(fields: [guideId], references: [id])
+  package             Package?           @relation(fields: [packageId], references: [id])
+  affiliate           Affiliate?         @relation(fields: [affiliateId], references: [id])
   chatConversations   ChatConversation[]
   invoices            Invoice[]
   payments            Payment[]
   reviews             Review[]
+  bookingInsurances   BookingInsurance[]
 
   @@index([clientId])
   @@index([tourId])
@@ -229,6 +252,8 @@ model Invoice {
   igvAmount      Decimal       @map("igv_amount") @db.Decimal(10, 2)
   totalAmount    Decimal       @map("total_amount") @db.Decimal(10, 2)
   includeIgv     Boolean       @default(true) @map("include_igv")
+  documentType   String        @default("boleta") @map("document_type") @db.VarChar(20)
+  ruc            String?       @db.VarChar(11)
   paymentMethod  String?       @map("payment_method") @db.VarChar(30)
   notes          String?
   terms          String?
@@ -242,6 +267,9 @@ model Invoice {
   booking        Booking       @relation(fields: [bookingId], references: [id])
   client         Client        @relation(fields: [clientId], references: [id])
   admin          AdminUser?    @relation(fields: [createdBy], references: [id])
+  sunatNotas     SunatNota[]
+  sunatBajas     SunatBaja[]
+  sunatLogs      SunatLog[]
 
   @@index([bookingId])
   @@index([clientId])
@@ -289,6 +317,7 @@ model BlogArticle {
   updatedAt       DateTime      @updatedAt @map("updated_at")
   admin           AdminUser?    @relation(fields: [createdBy], references: [id])
   relatedTour     Tour?         @relation(fields: [relatedTourId], references: [id])
+  translations    BlogTranslation[]
 
   @@index([slug])
   @@index([status])
@@ -366,6 +395,367 @@ model Notification {
 
   @@index([userId, isRead])
   @@map("notifications")
+}
+
+model Guide {
+  id           String   @id @default(uuid())
+  fullName     String   @map("full_name") @db.VarChar(150)
+  email        String?  @unique @db.VarChar(150)
+  phone        String?  @db.VarChar(30)
+  whatsapp     String?  @db.VarChar(30)
+  photoUrl     String?  @map("photo_url")
+  bio          String?
+  languages    String[]
+  specialties  String[]
+  licenseNumber String? @map("license_number") @db.VarChar(100)
+  rating       Decimal  @default(0) @db.Decimal(3, 2)
+  totalTours   Int      @default(0) @map("total_tours")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  availabilityGuides TourAvailabilityGuide[]
+  bookings           Booking[]
+
+  @@index([isActive])
+  @@map("guides")
+}
+
+model TourAvailabilityGuide {
+  id             String          @id @default(uuid())
+  availabilityId String          @map("availability_id")
+  guideId        String          @map("guide_id")
+  assignedAt     DateTime        @default(now()) @map("assigned_at")
+
+  availability   TourAvailability @relation(fields: [availabilityId], references: [id], onDelete: Cascade)
+  guide          Guide            @relation(fields: [guideId], references: [id], onDelete: Cascade)
+
+  @@unique([availabilityId, guideId])
+  @@map("tour_availability_guides")
+}
+
+model PromoCode {
+  id             String       @id @default(uuid())
+  code           String       @unique @db.VarChar(50)
+  description    String?      @db.VarChar(200)
+  discountType   DiscountType @map("discount_type")
+  discountValue  Decimal      @map("discount_value") @db.Decimal(10, 2)
+  minAmount      Decimal      @default(0) @map("min_amount") @db.Decimal(10, 2)
+  maxUses        Int?         @map("max_uses")
+  usesCount      Int          @default(0) @map("uses_count")
+  validFrom      DateTime     @default(now()) @map("valid_from")
+  validUntil     DateTime?    @map("valid_until")
+  applicableTours String[]    @map("applicable_tours")
+  isActive       Boolean      @default(true) @map("is_active")
+  createdBy      String?      @map("created_by")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  admin          AdminUser?   @relation(fields: [createdBy], references: [id])
+  bookings       Booking[]
+
+  @@index([code])
+  @@map("promo_codes")
+}
+
+model Package {
+  id              String        @id @default(uuid())
+  slug            String        @unique @db.VarChar(200)
+  thumbnailUrl    String?       @map("thumbnail_url")
+  durationDays    Int?          @map("duration_days")
+  originalPrice   Decimal?      @map("original_price") @db.Decimal(10, 2)
+  packagePrice    Decimal?      @map("package_price") @db.Decimal(10, 2)
+  savingsPercent  Decimal?      @map("savings_percent") @db.Decimal(5, 2)
+  minTravelers    Int           @default(1) @map("min_travelers")
+  maxTravelers    Int           @default(15) @map("max_travelers")
+  includes        String[]
+  notIncludes     String[]      @map("not_includes")
+  status          PackageStatus @default(draft)
+  createdBy       String?       @map("created_by")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  admin           AdminUser?    @relation(fields: [createdBy], references: [id])
+  packageTours    PackageTour[]
+  translations    PackageTranslation[]
+  bookings        Booking[]
+
+  @@index([slug])
+  @@index([status])
+  @@map("packages")
+}
+
+model PackageTour {
+  id         String  @id @default(uuid())
+  packageId  String  @map("package_id")
+  tourId     String  @map("tour_id")
+  dayNumber  Int?    @map("day_number")
+  sortOrder  Int     @default(0) @map("sort_order")
+
+  package    Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  tour       Tour    @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  @@unique([packageId, tourId])
+  @@map("package_tours")
+}
+
+model Affiliate {
+  id              String         @id @default(uuid())
+  fullName        String         @map("full_name") @db.VarChar(150)
+  email           String         @unique @db.VarChar(150)
+  phone           String?        @db.VarChar(30)
+  referralCode    String         @unique @map("referral_code") @db.VarChar(50)
+  commissionType  CommissionType @default(percent) @map("commission_type")
+  commissionValue Decimal        @default(10.00) @map("commission_value") @db.Decimal(10, 2)
+  totalReferrals  Int            @default(0) @map("total_referrals")
+  totalEarned     Decimal        @default(0) @map("total_earned") @db.Decimal(10, 2)
+  totalPaid       Decimal        @default(0) @map("total_paid") @db.Decimal(10, 2)
+  pendingPayment  Decimal        @default(0) @map("pending_payment") @db.Decimal(10, 2)
+  paymentMethod   String?        @map("payment_method") @db.VarChar(50)
+  paymentDetails  String?        @map("payment_details")
+  isActive        Boolean        @default(true) @map("is_active")
+  joinedAt        DateTime       @default(now()) @map("joined_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  payments        AffiliatePayment[]
+  bookings        Booking[]
+
+  @@index([referralCode])
+  @@map("affiliates")
+}
+
+model AffiliatePayment {
+  id          String    @id @default(uuid())
+  affiliateId String    @map("affiliate_id")
+  amount      Decimal   @db.Decimal(10, 2)
+  method      String?   @db.VarChar(50)
+  reference   String?   @db.VarChar(200)
+  notes       String?
+  paidAt      DateTime  @default(now()) @map("paid_at")
+
+  affiliate   Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@map("affiliate_payments")
+}
+
+model Subscriber {
+  id              String           @id @default(uuid())
+  email           String           @unique @db.VarChar(150)
+  fullName        String?          @map("full_name") @db.VarChar(150)
+  language        String           @default("es") @db.VarChar(10)
+  interests       String[]
+  source          SubscriberSource?
+  isActive        Boolean          @default(true) @map("is_active")
+  confirmed       Boolean          @default(false)
+  confirmToken    String?          @map("confirm_token") @db.VarChar(200)
+  subscribedAt    DateTime         @default(now()) @map("subscribed_at")
+  unsubscribedAt  DateTime?        @map("unsubscribed_at")
+
+  @@index([email])
+  @@index([isActive])
+  @@map("subscribers")
+}
+
+model EmailCampaign {
+  id          String         @id @default(uuid())
+  subject     String         @db.VarChar(300)
+  content     String
+  target      CampaignTarget @default(all)
+  status      CampaignStatus @default(draft)
+  scheduledAt DateTime?      @map("scheduled_at")
+  sentAt      DateTime?      @map("sent_at")
+  recipients  Int            @default(0)
+  opens       Int            @default(0)
+  clicks      Int            @default(0)
+  createdBy   String?        @map("created_by")
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  admin       AdminUser?     @relation(fields: [createdBy], references: [id])
+
+  @@map("email_campaigns")
+}
+
+model Wishlist {
+  id        String   @id @default(uuid())
+  clientId  String   @map("client_id")
+  tourId    String   @map("tour_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tour      Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, tourId])
+  @@index([clientId])
+  @@index([tourId])
+  @@map("wishlists")
+}
+
+model InsurancePlan {
+  id           String   @id @default(uuid())
+  name         String   @db.VarChar(150)
+  description  String?
+  pricePerPax  Decimal  @map("price_per_pax") @db.Decimal(10, 2)
+  coverage     String[]
+  maxCoverage  Decimal? @map("max_coverage") @db.Decimal(10, 2)
+  provider     String?  @db.VarChar(150)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  bookings     BookingInsurance[]
+
+  @@map("insurance_plans")
+}
+
+model BookingInsurance {
+  id           String          @id @default(uuid())
+  bookingId    String          @map("booking_id")
+  planId       String?         @map("plan_id")
+  travelers    Int
+  pricePerPax  Decimal         @map("price_per_pax") @db.Decimal(10, 2)
+  totalAmount  Decimal         @map("total_amount") @db.Decimal(10, 2)
+  policyNumber String?         @map("policy_number") @db.VarChar(100)
+  status       InsuranceStatus @default(active)
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  booking      Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  plan         InsurancePlan?  @relation(fields: [planId], references: [id])
+
+  @@unique([bookingId])
+  @@index([bookingId])
+  @@map("booking_insurance")
+}
+
+model TourTranslation {
+  id               String   @id @default(uuid())
+  tourId           String   @map("tour_id")
+  language         String   @db.VarChar(10)
+  name             String?  @db.VarChar(200)
+  shortDescription String?  @map("short_description")
+  fullDescription  String?  @map("full_description")
+  includes         String[]
+  notIncludes      String[] @map("not_includes")
+  whatToBring      String[] @map("what_to_bring")
+  meetingPoint     String?  @map("meeting_point")
+  metaTitle        String?  @map("meta_title") @db.VarChar(200)
+  metaDescription  String?  @map("meta_description")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tour             Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  @@unique([tourId, language])
+  @@index([tourId, language])
+  @@map("tour_translations")
+}
+
+model PackageTranslation {
+  id              String  @id @default(uuid())
+  packageId       String  @map("package_id")
+  language        String  @db.VarChar(10)
+  name            String? @db.VarChar(200)
+  description     String?
+  includes        String[]
+  notIncludes     String[] @map("not_includes")
+  metaTitle       String?  @map("meta_title") @db.VarChar(200)
+  metaDescription String?  @map("meta_description")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  package         Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@unique([packageId, language])
+  @@index([packageId, language])
+  @@map("package_translations")
+}
+
+model BlogTranslation {
+  id              String      @id @default(uuid())
+  articleId       String      @map("article_id")
+  language        String      @db.VarChar(10)
+  title           String?     @db.VarChar(300)
+  excerpt         String?
+  content         String?
+  metaTitle       String?     @map("meta_title") @db.VarChar(200)
+  metaDescription String?     @map("meta_description")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  article         BlogArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, language])
+  @@index([articleId, language])
+  @@map("blog_translations")
+}
+
+model SunatNota {
+  id                  String          @id @default(uuid())
+  invoiceId           String?         @map("invoice_id")
+  tipo                String          @db.VarChar(2)
+  serie               String          @db.VarChar(4)
+  correlativo         Int
+  motivoCodigo        String          @map("motivo_codigo") @db.VarChar(2)
+  motivoDescripcion   String          @map("motivo_descripcion")
+  monto               Decimal         @db.Decimal(10, 2)
+  sunatXml            String?         @map("sunat_xml")
+  sunatXmlFirmado     String?         @map("sunat_xml_firmado")
+  sunatHash           String?         @map("sunat_hash") @db.VarChar(200)
+  sunatCdr            String?         @map("sunat_cdr")
+  sunatCdrCodigo      String?         @map("sunat_cdr_codigo") @db.VarChar(10)
+  sunatStatus         SunatNotaStatus @default(pendiente) @map("sunat_status")
+  sunatEnviadoAt      DateTime?       @map("sunat_enviado_at")
+  sunatAceptadoAt     DateTime?       @map("sunat_aceptado_at")
+  createdBy           String?         @map("created_by")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  invoice             Invoice?        @relation(fields: [invoiceId], references: [id])
+  admin               AdminUser?      @relation(fields: [createdBy], references: [id])
+
+  @@index([invoiceId])
+  @@index([sunatStatus])
+  @@map("sunat_notas")
+}
+
+model SunatBaja {
+  id            String          @id @default(uuid())
+  invoiceId     String?         @map("invoice_id")
+  serie         String          @db.VarChar(4)
+  correlativo   Int
+  tipoDoc       String          @map("tipo_doc") @db.VarChar(2)
+  fechaEmision  DateTime        @map("fecha_emision") @db.Date
+  motivo        String
+  ticketSunat   String?         @map("ticket_sunat") @db.VarChar(50)
+  sunatXml      String?         @map("sunat_xml")
+  sunatCdr      String?         @map("sunat_cdr")
+  sunatStatus   SunatBajaStatus @default(pendiente) @map("sunat_status")
+  createdBy     String?         @map("created_by")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  invoice       Invoice?        @relation(fields: [invoiceId], references: [id])
+  admin         AdminUser?      @relation(fields: [createdBy], references: [id])
+
+  @@index([invoiceId])
+  @@map("sunat_bajas")
+}
+
+model SunatLog {
+  id           String   @id @default(uuid())
+  invoiceId    String?  @map("invoice_id")
+  accion       String?  @db.VarChar(50)
+  requestXml   String?  @map("request_xml")
+  responseXml  String?  @map("response_xml")
+  exitoso      Boolean  @default(false)
+  errorMensaje String?  @map("error_mensaje")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  invoice      Invoice? @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+  @@index([exitoso])
+  @@map("sunat_logs")
 }
 
 model sunat_series {
@@ -511,4 +901,66 @@ enum ChatStatus {
 enum ChatRole {
   user
   assistant
+}
+
+enum DiscountType {
+  percent
+  fixed
+}
+
+enum CommissionType {
+  percent
+  fixed
+}
+
+enum SubscriberSource {
+  website
+  popup
+  booking
+  blog
+  social
+  other
+}
+
+enum CampaignTarget {
+  all
+  vip
+  inactive
+  custom
+}
+
+enum CampaignStatus {
+  draft
+  scheduled
+  sent
+  canceled
+}
+
+enum PackageStatus {
+  draft
+  published
+  featured
+  hidden
+}
+
+enum InsuranceStatus {
+  active
+  canceled
+  claimed
+}
+
+enum SunatNotaStatus {
+  pendiente
+  generado
+  enviado
+  aceptado
+  rechazado
+  observado
+}
+
+enum SunatBajaStatus {
+  pendiente
+  enviado
+  aceptado
+  rechazado
 }
